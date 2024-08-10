@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { faAdd, faArrowUp, faCoffee, faFilePdf, faThumbTack } from '@fortawesome/free-solid-svg-icons';
+import { faAdd, faArrowUp, faCoffee, faFilePdf, faRotateRight, faShower, faThumbTack } from '@fortawesome/free-solid-svg-icons';
+import { faGithub, faLinkedin } from '@fortawesome/free-brands-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ReactMarkdown from 'react-markdown';
 
@@ -80,6 +81,66 @@ export default function Home() {
     }
   };
 
+  const chatCompletion = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question: input, stream: true }),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Error completing chat');
+      }
+  
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let fullText = '';
+      let botMessageIndex: any = null;
+  
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+  
+        const chunk = decoder.decode(value, { stream: true });
+  
+        // Parse each chunk as JSON to extract the content
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+        for (const line of lines) {
+          if (line === 'data: [DONE]') {
+            break;
+          }
+          const parsedData = JSON.parse(line.replace(/^data: /, ''));
+          const content = parsedData.choices[0].delta?.content;
+  
+          if (content) {
+            fullText += content;
+            
+            // Update the message in the state
+            if (botMessageIndex === null) {
+              setMessages(prev => {
+                const newMessages = [...prev, { sender: 'bot', text: fullText }];
+                botMessageIndex = newMessages.length - 1;
+                return newMessages;
+              });
+            } else {
+              setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[botMessageIndex].text = fullText;
+                return newMessages;
+              });
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Error completing chat:', error);
+      setMessages(prev => [...prev, { sender: 'bot', text: error.message }]);
+    }
+  };
+
   const updateIndex = async (file: any) => {
     console.log('Uploading file...');
 
@@ -130,13 +191,39 @@ export default function Home() {
         setFileName(file.name);
         updateIndex(file);
       }
-  }
+    }
   };
+
+  const startOver = () => {
+    console.log('Starting over...');
+    console.log('initializing...');
+    setMessages([{ sender: 'bot', text: 'Hello! How can I assist you today?' }]);
+    setInput('');
+    setLoading(false);
+    setProcessing(false);
+    setShowFileWindow(false);
+    setSelectedFile(null);
+    setValidated(false);
+    setFileName('');
+    setIndexName('');
+  }
+
+  const cleanChat = () => {
+    console.log('Cleaning chat...');
+    setMessages([{ sender: 'bot', text: 'Hello! How can I assist you today?' }]);
+    setInput('');
+  }
 
   const handleKeyDown = (e: any) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      if (validated) {
+        setMessages(prev => [...prev, { sender: 'user', text: input }]);
+        handleSendMessage();
+      } else {
+        setMessages(prev => [...prev, { sender: 'user', text: input }]);
+        chatCompletion();
+      }
     }
   };
 
@@ -173,14 +260,41 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col justify-between">
-      <button
-        onClick={() => window.open('https://buymeacoffee.com/abdibrokhim', '_blank')}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-[#eeeeee] text-black shadow cursor-pointer fixed top-4 right-4"
-      >
-        <FontAwesomeIcon icon={faCoffee} />
-      </button>
-
-      <div className="w-full lg:max-w-5xl mx-auto">
+      <div className='flex flex-col gap-4 fixed top-4 left-4'>
+        <button
+          onClick={startOver}
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-[#eeeeee] text-black shadow cursor-pointer "
+          >
+          <FontAwesomeIcon icon={faRotateRight} />
+        </button>
+        <button
+          onClick={cleanChat}
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-[#eeeeee] text-black shadow cursor-pointer "
+          >
+          <FontAwesomeIcon icon={faShower} />
+        </button>
+      </div>
+      <div className='flex flex-col gap-4 fixed top-4 right-4'>
+        <button
+          onClick={() => window.open('https://buymeacoffee.com/abdibrokhim', '_blank')}
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-[#eeeeee] text-black shadow cursor-pointer "
+          >
+          <FontAwesomeIcon icon={faCoffee} />
+        </button>
+        <button
+          onClick={() => window.open('https://github.com/abdibrokhim/Chat-With-PDF-NextJS-Langchain-Pinecone-OpenAI', '_blank')}
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-[#eeeeee] text-black shadow cursor-pointer "
+          >
+          <FontAwesomeIcon icon={faGithub} />
+        </button>
+        <button
+          onClick={() => window.open('https://linkedin.com/in/abdibrokhim', '_blank')}
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-[#eeeeee] text-black shadow cursor-pointer "
+          >
+          <FontAwesomeIcon icon={faLinkedin} />
+        </button>
+      </div>
+      <div className="w-full lg:max-w-5xl px-16 lg:px-0 mx-auto">
         <div className="mb-32 w-full lg:text-left overflow-auto">
           <div className="overflow-y-auto flex-1 p-4">
             {messages.map((message, index) => (
@@ -197,7 +311,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="w-full lg:max-w-5xl mx-auto flex items-center p-2 mb-8 fixed bottom-0 left-0 right-0 shadow-lg gap-4 bg-[#2e2e2e] rounded-full">
+      <div className="w-[80%] lg:max-w-5xl mx-auto flex items-center p-2 mb-8 fixed bottom-0 left-0 right-0 shadow-lg gap-4 bg-[#2e2e2e] rounded-full">
         <button
           disabled={loading}
           onClick={() => setShowFileWindow(!showFileWindow)}
@@ -221,7 +335,7 @@ export default function Home() {
         />
         <button
           disabled={loading || input === ''}
-          onClick={handleSendMessage}
+          onClick={validated ? handleSendMessage : chatCompletion}
           className={`flex items-center justify-center w-10 h-10 rounded-full shadow ${
             loading || input === '' ? 'cursor-not-allowed bg-[#4e4e4e] text-black'  : 'cursor-pointer bg-[#eeeeee] text-black'}`}
         >
@@ -242,7 +356,7 @@ export default function Home() {
                       {processing 
                         ? <span className='ml-8 flex justify-center items-center'>{loader()}</span>
                         : validated 
-                          ? <span className='ml-1 bg-[#4e4e4e] p-1 rounded'>{getFileName()}</span> 
+                          ? <span className='ml-1 bg-[#4e4e4e] p-1 rounded'>{getFileName()}</span>
                           : 'Error'
                       }
                     </>
