@@ -18,7 +18,8 @@ export default function Home() {
   const [validated, setValidated] = useState(false);
   const [fileName, setFileName] = useState('');
   const [indexName, setIndexName] = useState('');
-  const textareaRef = useRef(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const apiEndpoint = 'http://18.144.68.98:3001/';
 
   const getFileName = () => {
     return fileName.length > 15 ? `${fileName.substring(0, 15)}...` : fileName;
@@ -26,7 +27,7 @@ export default function Home() {
 
   const createIndex = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/createIndex', {
+      const response = await fetch(`${apiEndpoint}api/createIndex`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,7 @@ export default function Home() {
         throw new Error('No index available. Please upload a file first.');
       }
 
-      const response = await fetch('http://localhost:3001/api/queryIndex', {
+      const response = await fetch(`${apiEndpoint}api/queryIndex`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +84,7 @@ export default function Home() {
 
   const chatCompletion = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/chat', {
+      const response = await fetch(`${apiEndpoint}api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,12 +100,18 @@ export default function Home() {
       const decoder = new TextDecoder('utf-8');
       let fullText = '';
       let botMessageIndex: any = null;
-  
+
+      // console.log('=====================');
+      // console.log('reader:', reader);
+      
       while (true) {
         const { done, value } = await reader!.read();
         if (done) break;
-  
+        
         const chunk = decoder.decode(value, { stream: true });
+        
+        console.log('=====================');
+        console.log('chunk:', chunk);
   
         // Parse each chunk as JSON to extract the content
         const lines = chunk.split('\n').filter(line => line.trim() !== '');
@@ -114,7 +121,7 @@ export default function Home() {
           }
           const parsedData = JSON.parse(line.replace(/^data: /, ''));
           const content = parsedData.choices[0].delta?.content;
-  
+
           if (content) {
             fullText += content;
             
@@ -161,7 +168,7 @@ export default function Home() {
       formData.append('file', file);
       formData.append('indexName', currentIndexName);
   
-      const response = await fetch('http://localhost:3001/api/updateIndex', {
+      const response = await fetch(`${apiEndpoint}api/updateIndex`, {
         method: 'POST',
         body: formData, // No need to stringify or set Content-Type
       });
